@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WildView AR – Prototype</title>
+
+  <!-- model-viewer -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <style>
+    :root{
+      --bg0:#050814; --bg1:#070b1c;
+      --border: rgba(255,255,255,.12);
+      --muted: rgba(255,255,255,.74);
+      --text: rgba(255,255,255,.94);
+      --good: rgba(34,197,94,.35);
+      --bad: rgba(244,63,94,.35);
+      --grad: linear-gradient(135deg, rgba(56,189,248,1), rgba(168,85,247,1));
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 700px at 20% 10%, rgba(56,189,248,.12), transparent 55%),
+        radial-gradient(1000px 650px at 80% 15%, rgba(168,85,247,.12), transparent 55%),
+        radial-gradient(1100px 700px at 50% 100%, rgba(34,197,94,.08), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x:hidden;
+    }
+    .aurora {
+      position: fixed; inset:-20%;
+      background:
+        radial-gradient(700px 500px at 15% 15%, rgba(56,189,248,.16), transparent 60%),
+        radial-gradient(800px 520px at 85% 20%, rgba(168,85,247,.16), transparent 62%),
+        radial-gradient(900px 560px at 50% 95%, rgba(34,197,94,.10), transparent 65%);
+      filter: blur(18px);
+      opacity:.9;
+      z-index:0;
+      animation: drift 16s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes drift{
+      0%{ transform: translate3d(-1%, -1%, 0) scale(1); }
+      50%{ transform: translate3d(1.5%, 1%, 0) scale(1.04); }
+      100%{ transform: translate3d(-1%, -1%, 0) scale(1); }
+    }
+    .wrap{ position:relative; z-index:2; max-width:1100px; margin:0 auto; padding:84px 14px 86px; }
+
+    .topbar{
+      position: fixed; left:10px; right:10px; top:10px; z-index:10;
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 10px 12px;
+      backdrop-filter: blur(10px);
+    }
+    .brand{ font-weight:950; letter-spacing:.06em; }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px; border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      font-weight:850; font-size:12px; color:rgba(255,255,255,.88);
+      white-space:nowrap;
+    }
+    .nav{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+
+    .btn{
+      cursor:pointer;
+      border-radius: 12px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      padding: 9px 10px;
+      font-weight:850; font-size:12px;
+    }
+    .btn.primary{ border:none; background: var(--grad); padding: 10px 12px; font-weight:900; }
+
+    .card{
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+      backdrop-filter: blur(10px);
+    }
+    .panel{
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px;
+    }
+    h1{ margin:0; font-size:34px; letter-spacing:.03em; }
+    h2{ margin:0; font-size:22px; }
+    .muted{ color: var(--muted); line-height:1.5; }
+    .small{ font-size:12px; color: var(--muted); line-height:1.45; }
+
+    .grid{
+      display:grid; grid-template-columns: 1.6fr 1fr; gap: 12px; align-items:stretch;
+      margin-top:14px;
+    }
+    @media (max-width: 900px){ .grid{ grid-template-columns: 1fr; } }
+
+    .viewer{
+      height: 560px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      overflow:hidden;
+      background: rgba(255,255,255,.03);
+      position:relative;
+    }
+    model-viewer{ width:100%; height:100%; background: rgba(0,0,0,.16); }
+
+    .info{ height: 560px; overflow:auto; }
+
+    .sectionTitle{
+      font-weight:950; letter-spacing:.12em; text-transform:uppercase;
+      font-size:12px; opacity:.85; margin-bottom:10px;
+    }
+    .divider{ height:1px; background: var(--border); margin: 14px 0; }
+
+    .hotspot{
+      width:26px; height:26px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.35);
+      background: rgba(56,189,248,.18);
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+    }
+    .hotspot > span{ width:10px; height:10px; border-radius:999px; background: rgba(255,255,255,.88); display:block; }
+
+    .progress{
+      position:absolute; left:12px; right:12px; bottom:12px;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-weight: 850;
+    }
+    .arButton{
+      position:absolute; right:12px; bottom:12px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      cursor:pointer;
+      font-weight: 900;
+    }
+
+    .cards{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap:12px;
+    }
+    .animalCard{
+      text-align:left; padding:14px; border-radius:18px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.07);
+      cursor:pointer;
+    }
+    .animalCard .name{ font-weight:950; }
+    .animalCard .meta{ margin-top:6px; color:var(--muted); font-size:13px; }
+    .animalCard .one{ margin-top:10px; color:rgba(255,255,255,.82); line-height:1.45; }
+
+    .camBox{
+      width:100%; height:220px;
+      border-radius:18px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.22);
+      overflow:hidden;
+      position:relative;
+    }
+    video{ width:100%; height:100%; object-fit:cover; }
+    .camHint{
+      position:absolute; left:12px; top:12px;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.10);
+      padding:8px 10px;
+      border-radius:14px;
+      font-weight:850; font-size:12px;
+    }
+
+    .opt{
+      width:100%;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      cursor:pointer;
+      font-weight: 850;
+      text-align:left;
+      margin-bottom:8px;
+    }
+
+    .footer{
+      position: fixed; left:10px; right:10px; bottom:10px; z-index:10;
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 10px 12px;
+      backdrop-filter: blur(10px);
+      color: var(--muted);
+      font-size:12px;
+    }
+
+    .missingOverlay{
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      padding:18px;
+      background: rgba(0,0,0,.35);
+      border: 1px dashed rgba(255,255,255,.18);
+      border-radius: 18px;
+      text-align:center;
+      color: rgba(255,255,255,.90);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="aurora"></div>
+
+  <div class="topbar">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="brand">WildView AR</div>
+      <div class="pill" id="screenPill">Home</div>
+    </div>
+    <div class="nav">
+      <button class="btn" data-nav="home">Home</button>
+      <button class="btn" data-nav="library">Library</button>
+      <button class="btn" data-nav="viewer">Viewer</button>
+      <button class="btn" data-nav="learn">Learn</button>
+      <button class="btn" data-nav="identify">Identify</button>
+      <button class="btn primary" id="btnCamera">Camera: Off</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card" id="screenHome">
+      <h1>WildView AR</h1>
+      <p class="muted">
+        Sprint-MVP: <b>AR placement</b> (model-viewer), <b>hotspots</b> (anatomy info), and <b>learning</b>.
+      </p>
+      <div class="panel">
+        <div class="sectionTitle">Hinweis</div>
+        <div class="small">
+          AR: Android/Chrome funktioniert am besten (Scene Viewer). iPhone braucht später USDZ.
+        </div>
+      </div>
+      <div style="display:grid; gap:10px; margin-top:14px;">
+        <button class="btn primary" data-nav="library">Open Library</button>
+        <button class="btn" data-nav="viewer">Go to Viewer</button>
+        <button class="btn" data-nav="learn">Go to Learn (Quiz)</button>
+        <button class="btn" data-nav="identify">Go to Identify</button>
+      </div>
+    </div>
+
+    <div class="card" id="screenLibrary" style="display:none;">
+      <h2>Library</h2>
+      <p class="muted">Pick an animal → open Viewer (3D/AR + hotspots).</p>
+      <div class="cards" id="libraryGrid"></div>
+    </div>
+
+    <div class="card" id="screenViewer" style="display:none;">
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+        <div>
+          <h2 id="viewerTitle">Viewer</h2>
+          <div class="small" id="viewerMeta">—</div>
+        </div>
+        <select id="animalSelect" class="btn" style="padding:10px 12px; border-radius:14px;"></select>
+      </div>
+
+      <div class="grid">
+        <div class="viewer">
+          <model-viewer id="mv"
+            src=""
+            crossorigin="anonymous"
+            ar
+            ar-modes="scene-viewer quick-look webxr"
+            camera-controls
+            auto-rotate
+            rotation-per-second="18deg"
+            reveal="interaction"
+            environment-image="neutral"
+            shadow-intensity="0.6"
+            exposure="1.0"
+            alt="Animal">
+            <div slot="progress-bar" class="progress">Loading model…</div>
+            <button slot="ar-button" class="arButton">Show in AR</button>
+          </model-viewer>
+          <div id="missingOverlay" class="missingOverlay" style="display:none;">
+            <div>
+              <div style="font-weight:950; font-size:16px;">No 3D model available</div>
+              <div class="small" style="margin-top:8px;">
+                This animal currently has no GLB. Viewer stays functional (Quiz + Identify still work).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel info">
+          <div class="sectionTitle">Info</div>
+          <div id="infoBox" class="muted">Tap a hotspot on the model to see anatomy info.</div>
+
+          <div class="divider"></div>
+
+          <div class="sectionTitle">Camera Preview (optional)</div>
+          <div class="camBox">
+            <video id="cam" playsinline autoplay muted></video>
+            <div class="camHint" id="camHint">Normal camera preview (separate from AR)</div>
+          </div>
+          <div class="small" style="margin-top:10px;">
+            Camera needs HTTPS and permission. AR also uses the camera via the AR button.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="screenLearn" style="display:none;">
+      <h2>Learn (Mini Quiz)</h2>
+      <p class="muted">One strong learning element is enough for sprint validation.</p>
+      <div class="panel">
+        <div class="sectionTitle">Question</div>
+        <div id="quizQ" class="muted">—</div>
+        <div style="height:10px;"></div>
+        <div id="quizOpts"></div>
+        <div id="quizRes" class="small" style="margin-top:10px;"></div>
+        <button class="btn" id="quizNext" style="margin-top:10px;">New question (random animal)</button>
+      </div>
+    </div>
+
+    <div class="card" id="screenIdentify" style="display:none;">
+      <h2>Identify the Animal</h2>
+      <p class="muted">Show an image → choose the correct animal name.</p>
+      <div class="panel">
+        <div class="sectionTitle">Image</div>
+        <div style="border:1px solid var(--border); border-radius:18px; overflow:hidden; height:280px; background:rgba(0,0,0,.18);">
+          <img id="idImg"
+               alt="animal"
+               referrerpolicy="no-referrer"
+               crossorigin="anonymous"
+               style="width:100%; height:100%; object-fit:cover;" />
+        </div>
+        <div style="height:12px;"></div>
+        <div id="idOpts"></div>
+        <div id="idRes" class="small" style="margin-top:10px;"></div>
+        <button class="btn" id="idNext" style="margin-top:10px;">Next image</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>WildView AR Prototype • Static deploy (Vercel/GitHub)</div>
+    <div id="assetHint">GLB: OK • Images: OK</div>
+  </div>
+
+<script>
+  // GLB URLs (Lion intentionally empty)
+  const MODEL_URLS = {
+    wolf: "https://f.playcode.io/p-2665407/v-1/019c679d-7637-75ce-a057-bc9005889d26/wolf-1518.glb",
+    raccoon: "https://f.playcode.io/p-2665407/v-1/019c679d-b98e-73ee-8f8b-0d2b6e04da20/raccoon-1287.glb",
+    elephant: "https://f.playcode.io/p-2665407/v-1/019c679c-7153-7479-9be9-6ef80912a1e6/elephant-3223.glb",
+    lion: ""
+  };
+
+  // Image URLs (yours)
+  const IMAGE_URLS = {
+    wolf_img: "https://f.playcode.io/p-2665407/v-1/019c67b2-3d3a-776f-8d51-2787940c43cf/a_photograph_captures_a_grey_wolf_standing_in_a_su_1024.jpg",
+    raccoon_img: "https://f.playcode.io/p-2665407/v-1/019c67b2-5bec-76da-8605-eced1a0248ab/a_photograph_captures_a_raccoon_standing_on_a_moss_1024.jpg",
+    elephant_img: "https://f.playcode.io/p-2665407/v-1/019c67b2-237a-7144-ba14-36d2f7681333/a_photograph_captures_an_adult_african_elephant_st_1024.jpg",
+    lion_img: "https://f.playcode.io/p-2665407/v-1/019c67b1-b934-745c-8eea-e82ccf32b72a/a_photograph_captures_an_adult_male_lion_in_the_af_1024.jpg"
+  };
+
+  const ANIMALS = [
+    {
+      id:"wolf", name:"Wolf", group:"Mammal", habitat:"Forest/Tundra", size:"~0.85m",
+      oneLiner:"Team hunter with strong communication.",
+      modelKey:"wolf",
+      hotspots:[
+        { title:"Snout", text:"Powerful sense of smell for navigation and hunting.", position:"0.12m 0.06m 0.22m", normal:"0m 1m 0m" },
+        { title:"Ears",  text:"Directional hearing for coordination and detecting prey.", position:"0.06m 0.16m 0.12m", normal:"0m 1m 0m" }
+      ],
+      quiz:{
+        q:"What is the main function of a wolf’s howl?",
+        options:["Territory & communication","Only hunting","Sleeping","Camouflage"],
+        correct:"Territory & communication",
+        explain:"Howling coordinates packs and marks territory across long distances."
+      },
+      identify:{ imgKey:"wolf_img" }
+    },
+    {
+      id:"raccoon", name:"Raccoon", group:"Mammal", habitat:"Forest/City", size:"~0.35m",
+      oneLiner:"Extremely dexterous paws – thrives near humans.",
+      modelKey:"raccoon",
+      hotspots:[
+        { title:"Paws", text:"Very sensitive and skillful for grabbing and exploring.", position:"0.05m 0.02m 0.12m", normal:"0m 1m 0m" }
+      ],
+      quiz:{
+        q:"What is special about raccoon paws?",
+        options:["High sensitivity + dexterity","They can fly","They are made of metal","No fingers"],
+        correct:"High sensitivity + dexterity",
+        explain:"Raccoons use their paws like hands to manipulate objects."
+      },
+      identify:{ imgKey:"raccoon_img" }
+    },
+    {
+      id:"elephant", name:"Elephant", group:"Mammal", habitat:"Savanna/Forest", size:"~3.3m",
+      oneLiner:"Highly social – strong memory and communication.",
+      modelKey:"elephant",
+      hotspots:[
+        { title:"Trunk", text:"Grabbing, smelling, drinking – extremely versatile.", position:"0.2m 0.1m 0.2m", normal:"0m 1m 0m" },
+        { title:"Tusks", text:"Tools and defense; made of ivory.", position:"0.25m 0.12m 0.3m", normal:"0m 1m 0m" }
+      ],
+      quiz:{
+        q:"What is the elephant’s trunk mainly used for?",
+        options:["Grabbing + smelling + drinking","Only walking","Only fighting","Only sleeping"],
+        correct:"Grabbing + smelling + drinking",
+        explain:"The trunk combines fine motor control with powerful sensing."
+      },
+      identify:{ imgKey:"elephant_img" }
+    },
+    {
+      id:"lion", name:"Lion", group:"Mammal", habitat:"Savanna", size:"~1.2m",
+      oneLiner:"Social predator – often hunts in groups.",
+      modelKey:"lion",
+      hotspots:[
+        { title:"Mane", text:"Signals strength and offers protection during fights.", position:"0m 0.15m 0.1m", normal:"0m 1m 0m" },
+        { title:"Teeth", text:"Specialized for gripping and tearing flesh.", position:"0.12m 0.05m 0.2m", normal:"0m 1m 0m" }
+      ],
+      quiz:{
+        q:"Why is a lion’s mane useful?",
+        options:["Protection in fights","Better swimming","Flying","Diving"],
+        correct:"Protection in fights",
+        explain:"The mane protects the neck and signals fitness to rivals."
+      },
+      identify:{ imgKey:"lion_img" }
+    }
+  ];
+
+  // screens
+  const screens = {
+    home: document.getElementById("screenHome"),
+    library: document.getElementById("screenLibrary"),
+    viewer: document.getElementById("screenViewer"),
+    learn: document.getElementById("screenLearn"),
+    identify: document.getElementById("screenIdentify"),
+  };
+  const pill = document.getElementById("screenPill");
+  function showScreen(key){
+    Object.keys(screens).forEach(k => screens[k].style.display = (k===key ? "" : "none"));
+    pill.textContent = key.charAt(0).toUpperCase() + key.slice(1);
+  }
+  document.querySelectorAll("[data-nav]").forEach(btn=>{
+    btn.addEventListener("click", ()=> showScreen(btn.dataset.nav));
+  });
+
+  // library render
+  const grid = document.getElementById("libraryGrid");
+  grid.innerHTML = "";
+  ANIMALS.forEach(a=>{
+    const el = document.createElement("button");
+    el.className = "animalCard";
+    const hasModel = !!MODEL_URLS[a.modelKey];
+    el.innerHTML = `
+      <div class="name">${a.name}</div>
+      <div class="meta">${a.group} • ${a.habitat} • ${a.size}</div>
+      <div class="one">${a.oneLiner}</div>
+      <div class="meta" style="margin-top:10px;">
+        ${hasModel ? "✅ 3D/AR ready" : "⚠️ 3D model missing (still playable)"}
+      </div>
+    `;
+    el.addEventListener("click", ()=>{
+      setActiveAnimal(a.id);
+      showScreen("viewer");
+    });
+    grid.appendChild(el);
+  });
+
+  // viewer
+  const mv = document.getElementById("mv");
+  const title = document.getElementById("viewerTitle");
+  const meta = document.getElementById("viewerMeta");
+  const infoBox = document.getElementById("infoBox");
+  const sel = document.getElementById("animalSelect");
+  const assetHint = document.getElementById("assetHint");
+  const missingOverlay = document.getElementById("missingOverlay");
+
+  let activeAnimalId = ANIMALS[0].id;
+
+  sel.innerHTML = "";
+  ANIMALS.forEach(a=>{
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    opt.textContent = a.name;
+    sel.appendChild(opt);
+  });
+  sel.value = activeAnimalId;
+  sel.addEventListener("change", ()=> setActiveAnimal(sel.value));
+
+  function clearHotspots(){
+    const toRemove = mv.querySelectorAll("[data-hotspot-injected='1']");
+    toRemove.forEach(n => n.remove());
+  }
+
+  function injectHotspots(animal){
+    clearHotspots();
+    animal.hotspots.forEach((h, idx)=>{
+      const b = document.createElement("button");
+      b.setAttribute("slot", `hotspot-${idx}`);
+      b.setAttribute("data-position", h.position);
+      b.setAttribute("data-normal", h.normal);
+      b.setAttribute("data-hotspot-injected", "1");
+      b.className = "hotspot";
+      b.innerHTML = "<span></span>";
+      b.title = h.title;
+      b.addEventListener("click", ()=>{
+        infoBox.innerHTML = `<div style="font-weight:950; font-size:16px;">${h.title}</div>
+                             <div style="margin-top:8px;" class="muted">${h.text}</div>`;
+      });
+      mv.appendChild(b);
+    });
+  }
+
+  // quiz
+  const quizQ = document.getElementById("quizQ");
+  const quizOpts = document.getElementById("quizOpts");
+  const quizRes = document.getElementById("quizRes");
+  const quizNext = document.getElementById("quizNext");
+
+  function renderQuiz(animal){
+    const q = animal.quiz;
+    quizQ.textContent = q.q;
+    quizOpts.innerHTML = "";
+    quizRes.textContent = "";
+    let locked = false;
+
+    q.options.forEach(opt=>{
+      const b = document.createElement("button");
+      b.className = "opt";
+      b.textContent = opt;
+      b.addEventListener("click", ()=>{
+        if(locked) return;
+        locked = true;
+        const correct = (opt === q.correct);
+        b.style.border = correct ? `1px solid var(--good)` : `1px solid var(--bad)`;
+        b.style.background = correct ? "rgba(34,197,94,.15)" : "rgba(244,63,94,.15)";
+        quizRes.innerHTML = correct
+          ? `✅ Correct.<div style="margin-top:6px; opacity:.85;">${q.explain}</div>`
+          : `❌ Wrong. Correct is: <b>${q.correct}</b><div style="margin-top:6px; opacity:.85;">${q.explain}</div>`;
+      });
+      quizOpts.appendChild(b);
+    });
+  }
+
+  quizNext.addEventListener("click", ()=>{
+    const random = ANIMALS[Math.floor(Math.random()*ANIMALS.length)];
+    setActiveAnimal(random.id);
+    showScreen("learn");
+  });
+
+  // identify
+  const idImg = document.getElementById("idImg");
+  const idOpts = document.getElementById("idOpts");
+  const idRes = document.getElementById("idRes");
+  const idNext = document.getElementById("idNext");
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function renderIdentify(){
+    const candidates = ANIMALS.filter(a=>a.identify && a.identify.imgKey && IMAGE_URLS[a.identify.imgKey]);
+    const target = candidates[Math.floor(Math.random()*candidates.length)];
+    idImg.src = IMAGE_URLS[target.identify.imgKey] + (IMAGE_URLS[target.identify.imgKey].includes("?") ? "&" : "?") + "t=" + Date.now();
+
+    const names = new Set([target.name]);
+    while(names.size < 4) names.add(ANIMALS[Math.floor(Math.random()*ANIMALS.length)].name);
+    const options = shuffle(Array.from(names));
+
+    idOpts.innerHTML = "";
+    idRes.textContent = "";
+    let locked = false;
+
+    options.forEach(name=>{
+      const b = document.createElement("button");
+      b.className = "opt";
+      b.textContent = name;
+      b.addEventListener("click", ()=>{
+        if(locked) return;
+        locked = true;
+        const correct = (name === target.name);
+        b.style.border = correct ? `1px solid var(--good)` : `1px solid var(--bad)`;
+        b.style.background = correct ? "rgba(34,197,94,.15)" : "rgba(244,63,94,.15)";
+        idRes.innerHTML = correct ? `✅ Correct.` : `❌ Wrong. Correct is: <b>${target.name}</b>`;
+      });
+      idOpts.appendChild(b);
+    });
+
+    assetHint.textContent = "GLB: OK • Images: OK";
+  }
+
+  idNext.addEventListener("click", ()=> renderIdentify());
+
+  function setActiveAnimal(id){
+    const animal = ANIMALS.find(x=>x.id===id) || ANIMALS[0];
+    activeAnimalId = animal.id;
+    sel.value = animal.id;
+
+    title.textContent = animal.name;
+    meta.textContent = `${animal.group} • ${animal.habitat} • ${animal.size}`;
+
+    const url = MODEL_URLS[animal.modelKey];
+    const arBtn = mv.querySelector("button[slot='ar-button']");
+
+    if(url){
+      missingOverlay.style.display = "none";
+      if(arBtn) arBtn.style.display = "";
+      mv.src = url;
+      mv.alt = animal.name;
+      infoBox.textContent = "Tap a hotspot on the model to see anatomy info.";
+      clearHotspots(); // inject after load
+    } else {
+      mv.src = "";
+      mv.alt = animal.name;
+      clearHotspots();
+      missingOverlay.style.display = "";
+      if(arBtn) arBtn.style.display = "none";
+      infoBox.innerHTML = `<div style="font-weight:950; font-size:16px;">${animal.name}: 3D model missing</div>
+                           <div class="small" style="margin-top:8px;">No GLB uploaded for this animal. Quiz + Identify still work.</div>`;
+    }
+
+    renderQuiz(animal);
+    renderIdentify();
+  }
+
+  // Hotspots only after model load (stabil)
+  mv.addEventListener("load", ()=>{
+    const animal = ANIMALS.find(x=>x.id===activeAnimalId) || ANIMALS[0];
+    if(!MODEL_URLS[animal.modelKey]) return;
+    injectHotspots(animal);
+  });
+
+  // camera preview (no alerts)
+  const camBtn = document.getElementById("btnCamera");
+  const video = document.getElementById("cam");
+  const camHint = document.getElementById("camHint");
+  let stream = null;
+
+  async function startCam(){
+    if(stream) return;
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio:false });
+      video.srcObject = stream;
+      camBtn.textContent = "Camera: On";
+      camHint.textContent = "Camera preview is running";
+    }catch(e){
+      camBtn.textContent = "Camera: Denied";
+      camHint.textContent = "Camera blocked. Use HTTPS + allow permission.";
+    }
+  }
+  function stopCam(){
+    if(!stream) return;
+    stream.getTracks().forEach(t=>t.stop());
+    stream = null;
+    video.srcObject = null;
+    camBtn.textContent = "Camera: Off";
+    camHint.textContent = "Normal camera preview (separate from AR)";
+  }
+  camBtn.addEventListener("click", ()=> stream ? stopCam() : startCam());
+
+  // init
+  setActiveAnimal(activeAnimalId);
+  showScreen("home");
+</script>
+</body>
+</html>
