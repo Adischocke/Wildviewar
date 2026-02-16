@@ -1,0 +1,15 @@
+# WildView AR (Prototype)
+
+Static single-file prototype with:
+- Library
+- Viewer (3D + AR via model-viewer)
+- Hotspots (anatomy info)
+- Learn quiz
+- Identify game (images)
+
+## Deploy
+### Vercel
+Import the GitHub repo in Vercel. No build settings needed.
+
+### GitHub Pages
+Settings → Pages → Deploy from branch → main / root
